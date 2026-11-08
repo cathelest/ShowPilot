@@ -97,6 +97,10 @@
 .fppm-act { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.86rem; }
 .fppm-act li { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .fppm-muted { color: var(--text-muted); }
+.fppm-eye { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--accent, var(--rgb-blue)); cursor: pointer; }
+.fppm-eye:hover { background: var(--bg-tertiary); border-color: var(--border); }
+.fppm-eye:focus-visible { outline: 2px solid var(--accent, var(--rgb-blue)); outline-offset: 1px; }
+.fppm-eye.fppm-eye-off { color: var(--text-muted); }
 #fppDashCard { cursor: pointer; display: flex; align-items: center; gap: 10px; }
 #fppDashCard .fppm-dot { width: 10px; height: 10px; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .fppm-dot.fppm-live { animation: none; } .fppm-bar > span { transition: none; } }
@@ -309,7 +313,7 @@
         h('td', {}, r.version),
         h('td', {}, r.ageSeconds === null ? '' : ago(r.ageSeconds * 1000)),
         h('td', { style: 'text-align:right;' },
-          h('button', { type: 'button', class: 'secondary', style: 'padding:2px 10px;font-size:0.8rem;', title: isHidden ? 'Show this system in the list again' : 'Hide this system from the list and its warnings', onclick: () => setHidden(name, !isHidden) }, isHidden ? 'Unhide' : 'Hide'))));
+          h('button', { type: 'button', class: 'fppm-eye' + (isHidden ? ' fppm-eye-off' : ''), title: isHidden ? 'Hidden: click to show it again' : 'Shown: click to hide it and its warnings', 'aria-label': (isHidden ? 'Show ' : 'Hide ') + name, 'aria-pressed': isHidden ? 'false' : 'true', onclick: () => setHidden(name, !isHidden) }, eyeIcon(!isHidden)))));
     });
     const head = [h('th', {}, 'System'), h('th', {}, 'Mode')];
     if (anyStats) head.push(h('th', {}, 'Status'), h('th', {}, 'CPU temp'), h('th', {}, 'CPU'), h('th', {}, 'Memory'), h('th', {}, 'Uptime'));
@@ -320,12 +324,27 @@
       rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:0;' }, 'All systems are hidden.'));
     }
     if (hiddenCount) {
-      rem.appendChild(h('button', { type: 'button', class: 'secondary', style: 'margin-top:10px;font-size:0.85rem;', onclick: () => { showHidden = !showHidden; render(); } },
+      rem.appendChild(h('button', { type: 'button', class: 'secondary', style: 'margin-top:10px;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px;', onclick: () => { showHidden = !showHidden; render(); } },
+        eyeIcon(!showHidden),
         showHidden ? 'Hide the hidden systems' : 'Show ' + hiddenCount + ' hidden system' + (hiddenCount === 1 ? '' : 's')));
     }
     if (!anyStats) {
       rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:10px 0 0;' }, 'Each remote’s temperature, CPU, memory and uptime show here with the ShowPilot plugin 0.14.27 or newer.'));
     }
+  }
+
+  // Eye icons, the same drawing as the Sequences page's Visible switch
+  // (open = shown, crossed out = hidden). Built as SVG nodes, no innerHTML.
+  function eyeIcon(open) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '16', height: '16', fill: 'none', stroke: 'currentColor',
+      'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
+    const paths = open
+      ? ['M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z']
+      : ['M9.9 5.2A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.4 3.3', 'M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6', 'M9.9 9.9a3 3 0 0 0 4.2 4.2', 'M3 3l18 18'];
+    for (const d of paths) { const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); svg.appendChild(p); }
+    return svg;
   }
 
   // Hidden MultiSync systems (v0.33.278-master.14+), by host name (or address):

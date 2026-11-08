@@ -51,7 +51,7 @@ Every other system FPP sees on its network (remotes, other players, controllers 
 
 With the ShowPilot plugin 0.14.27 or newer, each FPP in the list also shows what it's doing (**Status**), its **CPU temp**, **CPU**, **Memory** and **Uptime**. A remote's temperature is flagged like the main FPP's: amber at 70°C, red at 80°C. Systems that aren't FPP (controllers, for example) show "—".
 
-**Hide** takes a system off the list, and its warnings off this page and the Dashboard strip. Use it for things you don't need to watch, such as a spare Pi. **Show hidden** lists them again (dimmed) with **Unhide**. What you hide is remembered for your account.
+The **eye** at the end of each row works like the Visible switch on the Sequences page: click it to hide a system (the eye is crossed out), which takes it off the list and its warnings off this page and the Dashboard strip. Use it for things you don't need to watch, such as a spare Pi. **Show hidden** lists hidden systems again (dimmed); click the crossed-out eye to bring one back. What you hide is remembered for your account.
 
 ## Dashboard strip
 
