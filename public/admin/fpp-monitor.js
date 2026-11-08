@@ -196,7 +196,8 @@
     if (!d) return;
     const v = d.view;
     const age = (d.ageMs || 0) + (Date.now() - lastAt);
-    const level = d.health ? d.health.level : 'unknown';
+    const hv = visibleHealth(d.health);
+    const level = hv.level;
     const dot = $('fppmDot');
     dot.style.color = d.connected ? LEVEL_COLOR[level] || LEVEL_COLOR.unknown : LEVEL_COLOR[d.receivedAt ? 'bad' : 'unknown'];
     dot.classList.toggle('fppm-live', !!(d.connected && v && v.state === 'playing'));
@@ -218,7 +219,7 @@
 
     const issues = $('fppmIssues');
     issues.textContent = '';
-    ((d.health && d.health.items) || []).forEach((i) => issues.appendChild(h('li', { 'data-level': i.level }, i.text)));
+    (hv.items || []).forEach((i) => issues.appendChild(h('li', { 'data-level': i.level }, i.text)));
     issues.style.display = issues.children.length ? '' : 'none';
 
     // Controls are usable while the show player is checking in.
@@ -266,20 +267,93 @@
     row('Plugin', d.pluginVersion ? 'v' + String(d.pluginVersion).replace(/^v/, '') : '');
     row('Last report', d.receivedAt ? ago(age) : '');
 
-    // MultiSync
+    renderRemotes(v.remotes);
+  }
+
+  // MultiSync list. Each remote's stats (status, CPU temperature, CPU,
+  // memory, uptime) come from plugin 0.14.27+, which asks every remote FPP
+  // sees; with an older plugin those columns show "—". Remotes can be hidden
+  // (remembered for the account); "Show hidden" lists them again, dimmed.
+  function renderRemotes(remotes) {
     const rem = $('fppmRemotes');
     rem.textContent = '';
-    if (!v.remotes.length) {
+    if (!remotes.length) {
       rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:0;' }, 'FPP doesn’t see any other systems.'));
-    } else {
-      const tb = h('tbody');
-      v.remotes.forEach((r) => tb.appendChild(h('tr', {},
-        h('td', {}, h('span', { class: 'fppm-dot', style: 'display:inline-block;width:9px;height:9px;box-shadow:none;margin-right:8px;color:' + (r.online === null ? LEVEL_COLOR.unknown : r.online ? LEVEL_COLOR.ok : LEVEL_COLOR.bad) }), r.hostName || r.address),
-        h('td', {}, r.address), h('td', {}, r.mode || r.type), h('td', {}, r.version),
-        h('td', {}, r.ageSeconds === null ? '' : ago(r.ageSeconds * 1000)))));
-      rem.appendChild(h('div', { style: 'overflow-x:auto;' }, h('table', { class: 'fppm-table' },
-        h('thead', {}, h('tr', {}, h('th', {}, 'System'), h('th', {}, 'Address'), h('th', {}, 'Mode'), h('th', {}, 'Version'), h('th', {}, 'Last seen'))), tb)));
+      return;
     }
+    const hidden = new Set(hiddenList());
+    const nameOf = (r) => r.hostName || r.address;
+    const hiddenCount = remotes.filter((r) => hidden.has(nameOf(r))).length;
+    if (!hiddenCount) showHidden = false;
+    const rows = remotes.filter((r) => showHidden || !hidden.has(nameOf(r)));
+    const anyStats = remotes.some((r) => r.stats);
+    const pct = (n) => (n === null || n === undefined || !isFinite(n) ? '—' : Math.round(n) + '%');
+    const tb = h('tbody');
+    rows.forEach((r) => {
+      const name = nameOf(r);
+      const isHidden = hidden.has(name);
+      const s = r.stats;
+      const t = s && s.cpuTemp !== null && s.cpuTemp !== undefined ? s.cpuTemp : null;
+      const status = !s ? '—' : (STATE_TEXT[s.state] || s.state || '—') + (s.state === 'playing' && s.sequence ? ' · ' + s.sequence : '');
+      tb.appendChild(h('tr', { style: isHidden ? 'opacity:0.55;' : '' },
+        h('td', {},
+          h('span', { class: 'fppm-dot', style: 'display:inline-block;width:9px;height:9px;box-shadow:none;margin-right:8px;color:' + (r.online === null ? LEVEL_COLOR.unknown : r.online ? LEVEL_COLOR.ok : LEVEL_COLOR.bad) }),
+          name,
+          r.hostName && r.address ? h('div', { class: 'fppm-muted', style: 'font-size:0.8rem;margin-left:17px;' }, r.address) : null),
+        h('td', {}, r.mode || r.type),
+        anyStats ? h('td', {}, status) : null,
+        anyStats ? h('td', { style: 'font-variant-numeric:tabular-nums;' + (t === null ? '' : 'color:' + (t >= 80 ? 'var(--status-danger)' : t >= 70 ? 'var(--status-warning)' : 'var(--status-success)') + ';font-weight:600;') }, t === null ? '—' : Math.round(t) + '°C') : null,
+        anyStats ? h('td', { style: 'font-variant-numeric:tabular-nums;' }, pct(s && s.cpuPercent)) : null,
+        anyStats ? h('td', { style: 'font-variant-numeric:tabular-nums;' }, pct(s && s.memoryPercent)) : null,
+        anyStats ? h('td', {}, (s && s.uptime) || '—') : null,
+        h('td', {}, r.version),
+        h('td', {}, r.ageSeconds === null ? '' : ago(r.ageSeconds * 1000)),
+        h('td', { style: 'text-align:right;' },
+          h('button', { type: 'button', class: 'secondary', style: 'padding:2px 10px;font-size:0.8rem;', title: isHidden ? 'Show this system in the list again' : 'Hide this system from the list and its warnings', onclick: () => setHidden(name, !isHidden) }, isHidden ? 'Unhide' : 'Hide'))));
+    });
+    const head = [h('th', {}, 'System'), h('th', {}, 'Mode')];
+    if (anyStats) head.push(h('th', {}, 'Status'), h('th', {}, 'CPU temp'), h('th', {}, 'CPU'), h('th', {}, 'Memory'), h('th', {}, 'Uptime'));
+    head.push(h('th', {}, 'Version'), h('th', {}, 'Last seen'), h('th', {}));
+    if (rows.length) {
+      rem.appendChild(h('div', { style: 'overflow-x:auto;' }, h('table', { class: 'fppm-table' }, h('thead', {}, h('tr', {}, head)), tb)));
+    } else {
+      rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:0;' }, 'All systems are hidden.'));
+    }
+    if (hiddenCount) {
+      rem.appendChild(h('button', { type: 'button', class: 'secondary', style: 'margin-top:10px;font-size:0.85rem;', onclick: () => { showHidden = !showHidden; render(); } },
+        showHidden ? 'Hide the hidden systems' : 'Show ' + hiddenCount + ' hidden system' + (hiddenCount === 1 ? '' : 's')));
+    }
+    if (!anyStats) {
+      rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:10px 0 0;' }, 'Each remote’s temperature, CPU, memory and uptime show here with the ShowPilot plugin 0.14.27 or newer.'));
+    }
+  }
+
+  // Hidden MultiSync systems (v0.33.278-master.14+), by host name (or address):
+  // saved on the account when the admin has SPPrefs, otherwise in this browser.
+  const HIDE_KEY = 'sp_fpp_hidden_remotes';
+  let showHidden = false;
+  function hiddenList() {
+    let raw = null;
+    try { raw = window.SPPrefs ? window.SPPrefs.get(HIDE_KEY) : window.localStorage.getItem(HIDE_KEY); } catch (_) { raw = null; }
+    try { const a = JSON.parse(raw || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch (_) { return []; }
+  }
+  function setHidden(name, hide) {
+    const set = new Set(hiddenList());
+    if (hide) set.add(name); else set.delete(name);
+    const val = set.size ? JSON.stringify([...set].slice(0, 100)) : null;
+    try {
+      if (window.SPPrefs) window.SPPrefs.set(HIDE_KEY, val);
+      else if (val) window.localStorage.setItem(HIDE_KEY, val);
+      else window.localStorage.removeItem(HIDE_KEY);
+    } catch (_) { /* couldn't be saved */ }
+    render();
+  }
+  // The server's health list without the hidden systems' warnings.
+  function visibleHealth(hl) {
+    if (!hl || hl.level === 'unknown') return hl || { level: 'unknown', items: [] };
+    const hidden = new Set(hiddenList());
+    const items = (hl.items || []).filter((i) => !i.remote || !hidden.has(i.remote));
+    return { level: items.some((i) => i.level === 'bad') ? 'bad' : items.length ? 'warn' : 'ok', items };
   }
   // Time left counts down locally between reports.
   function paintProgress() {
@@ -355,7 +429,8 @@
     if (!el) return;
     if (!s || !s.reporting) { el.style.display = 'none'; return; }
     ensureStyle();
-    const level = s.connected ? (s.health && s.health.level) || 'ok' : 'bad';
+    const hv = visibleHealth(s.health);
+    const level = s.connected ? hv.level || 'ok' : 'bad';
     const parts = [];
     if (!s.connected) parts.push('not checking in');
     else {
@@ -363,7 +438,7 @@
       if (s.state === 'playing' && (s.sequence || s.playlist)) parts.push(s.sequence || s.playlist);
       if (s.cpuTemp !== null && s.cpuTemp !== undefined) parts.push(Math.round(s.cpuTemp) + '°C');
     }
-    const first = s.health && s.health.items && s.health.items[0];
+    const first = hv.items && hv.items[0];
     el.textContent = '';
     el.appendChild(h('span', { class: 'fppm-dot', style: 'color:' + LEVEL_COLOR[level] }));
     el.appendChild(h('span', { style: 'flex:1;' }, h('b', {}, (s.hostName || 'FPP') + ': '), parts.join(' · '), level !== 'ok' && first ? ' — ' + first.text : ''));
