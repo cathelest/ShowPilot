@@ -27,6 +27,8 @@ server fell back to FPP's MultiSync `lastSeen`, which FPP only refreshes now
 and then, and warned "*remote* (MultiSync remote) not seen recently" for
 remotes that were working fine. No update banner appeared either, because
 0.14.26 *was* the newest released plugin. The owner had no way to fix it.
+Fixed in v0.33.280-master.2: unchecked remotes show as unknown, and the
+update note waits until the plugin is released.
 
 ## What the server knows about the plugin
 

@@ -295,14 +295,17 @@
     row('Plugin', d.pluginVersion ? 'v' + String(d.pluginVersion).replace(/^v/, '') : '');
     row('Last report', d.receivedAt ? ago(age) : '');
 
-    renderRemotes(v.remotes);
+    renderRemotes(v.remotes, d.remoteChecks);
   }
 
   // MultiSync list. Each remote's stats (status, CPU temperature, CPU,
   // memory, uptime) come from plugin 0.14.27+, which asks every remote FPP
-  // sees; with an older plugin those columns show "—". Remotes can be hidden
-  // (remembered for the account); "Show hidden" lists them again, dimmed.
-  function renderRemotes(remotes) {
+  // sees; with an older plugin those columns show "—" and the dot stays grey
+  // (unknown, not offline). Remotes can be hidden (remembered for the
+  // account); "Show hidden" lists them again, dimmed.
+  // checks (v0.33.280-master.2): the server's remoteChecks; the update note
+  // only shows once the plugin that checks remotes is released.
+  function renderRemotes(remotes, checks) {
     const rem = $('fppmRemotes');
     rem.textContent = '';
     if (!remotes.length) {
@@ -352,8 +355,8 @@
         eyeIcon(),
         showHidden ? 'Hide the hidden systems' : 'Show ' + hiddenCount + ' hidden system' + (hiddenCount === 1 ? '' : 's')));
     }
-    if (!anyStats) {
-      rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:10px 0 0;' }, 'Each remote’s temperature, CPU, memory and uptime show here with the ShowPilot plugin 0.14.27 or newer.'));
+    if (!anyStats && checks && checks.updateAvailable) {
+      rem.appendChild(h('p', { class: 'fppm-sub', style: 'margin:10px 0 0;' }, 'Update the ShowPilot plugin in FPP (Plugin Manager) to v' + checks.pluginNeeded + ' or newer to see whether each remote is online, with its temperature, CPU, memory and uptime.'));
     }
   }
 

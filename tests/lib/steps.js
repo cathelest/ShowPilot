@@ -382,7 +382,7 @@ const STEPS = [
 
   // ===== FPP monitor =====
   { doc: 'the show player reports FPP playing "A.fseq" from "Christmas" | idle [, the CPU at N°C] [, N% disk free] [, with the remote "Name" online | offline] [, with MultiSync packets on | off]',
-    re: new RegExp(`^the show player reports FPP (playing ${q} from ${q}|idle)(?:, the CPU at (\\d+)°C)?(?:, (\\d+)% disk free)?(?:, with the remote ${q} (online|offline))?(?:, with MultiSync packets (on|off))?$`, 'i'),
+    re: new RegExp(`^the show player reports FPP (playing ${q} from ${q}|idle)(?:, the CPU at (\\d+)°C)?(?:, (\\d+)% disk free)?(?:, with the remote ${q} (online|offline|unchecked))?(?:, with MultiSync packets (on|off))?$`, 'i'),
     fn: async (ctx, _w, seq, pl, temp, disk, remote, online, msync) => {
       const now = Math.floor(Date.now() / 1000);
       const playing = !!seq;
@@ -400,6 +400,11 @@ const STEPS = [
         },
         multisync: { systems: [{ local: 1, hostname: 'ShowFPP', address: '10.0.0.20', fppModeString: 'player', lastSeen: now }].concat(remote
           ? [{ local: 0, hostname: remote, address: '10.0.0.21', fppModeString: 'remote', version: '10.1', lastSeen: online.toLowerCase() === 'online' ? now - 5 : now - 600 }] : []) },
+        // online/offline: what plugin 0.14.27+ found when it asked the remote
+        // (its status, or null = no answer). unchecked: an older plugin that
+        // doesn't ask, with FPP's lastSeen long out of date.
+        ...(remote && online.toLowerCase() !== 'unchecked'
+          ? { remoteStatus: { '10.0.0.21': online.toLowerCase() === 'online' ? { status_name: 'idle', advancedView: { Utilization: { CPU: 5, Memory: 30 } }, sensors: [] } : null } } : {}),
         disk: disk ? { freeBytes: Number(disk) * 1e9, totalBytes: 100e9 } : { freeBytes: 40e9, totalBytes: 100e9 },
         playlists: ['Christmas', 'Halloween'], presets: ['Flood On', 'Fog'],
         results: (ctx.last.fppCommands || []).map(c => ({ id: c.id, ok: true, message: '' })),

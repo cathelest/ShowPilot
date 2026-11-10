@@ -26,7 +26,14 @@ Scenario: A hot CPU, a full disk and a missing remote are flagged
   And the FPP page shows "Disk almost full"
   When the show player reports FPP idle, the CPU at 50°C, 40% disk free, with the remote "Matrix" offline
   Then the FPP health is warn
-  And the FPP page shows "not seen recently"
+  And the FPP page shows "isn’t answering"
+
+Scenario: A remote an older plugin can't check isn't called offline
+  Given the show has songs "Alpha", "Bravo" and "Charlie"
+  When the show player reports FPP idle, the CPU at 50°C, 40% disk free, with the remote "Matrix" unchecked
+  Then the FPP health is ok
+  And the FPP page shows "Matrix"
+  And the FPP page does not show "isn’t answering"
 
 Scenario: Controls reach the show player and report back
   Given the show has songs "Alpha", "Bravo" and "Charlie"
